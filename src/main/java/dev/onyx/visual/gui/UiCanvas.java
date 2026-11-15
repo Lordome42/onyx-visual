@@ -29,6 +29,13 @@ public interface UiCanvas {
 	}
 	float textWidth(String text, float size, boolean strong);
 
+	/** Cheap low-detail shape (0 square, 1 circle, 2 triangle) for the many dim background cells. */
+	default UiCanvas coarseShape(int shape, float cx, float cy, float r, int color) {
+		if (shape == 0) return rect(cx - r, cy - r, r * 2, r * 2, color);
+		if (shape == 1) return circle(cx, cy, r, color);
+		return triangle(cx, cy - r, cx - r, cy + r, cx + r, cy + r, color);
+	}
+
 	void pushScissor(float x, float y, float w, float h);
 	void popScissor();
 

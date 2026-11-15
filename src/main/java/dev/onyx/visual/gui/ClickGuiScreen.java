@@ -14,12 +14,18 @@ import net.minecraft.network.chat.Component;
 public final class ClickGuiScreen extends Screen {
 	private final ClickGui gui;
 	private long lastFrame = System.nanoTime();
-	private boolean down, pressed, rightPressed;
+	private boolean down, pressed, rightPressed, releaseQueued;
+	/** Settings are written at most twice a second (a slider drag changes them every frame). */
+	private boolean dirty;
+	private long lastSave;
+	/** Test hook: when set, replaces the real cursor position (GUI units). */
+	private int fakeX = Integer.MIN_VALUE, fakeY;
 
 	public ClickGuiScreen() {
 		super(Component.translatable("onyxvisual.screen.title"));
 		OnyxConfig config = OnyxConfig.get();
-		Runnable save = config::save;
+		Tr.set(key -> net.minecraft.client.resources.language.I18n.get(key));
+		Runnable save = () -> dirty = true;
 		gui = new ClickGui(OnyxModules.create(config, save, () -> OnyxVisual.settingsKey.getTranslatedKeyMessage().getString().toUpperCase(java.util.Locale.ROOT)),
 				config.gui, Binds.get(), save);
 	}
@@ -39,15 +45,41 @@ public final class ClickGuiScreen extends Screen {
 		long now = System.nanoTime();
 		float dt = Math.min(.05f, (now - lastFrame) / 1_000_000_000f);
 		lastFrame = now;
-		McCanvas canvas = new McCanvas(g, this.font, (float) Minecraft.getInstance().getWindow().getGuiScale());
+		if (fakeX != Integer.MIN_VALUE) {
+			mouseX = fakeX;
+			mouseY = fakeY;
+		}
+		float guiScale = (float) Minecraft.getInstance().getWindow().getGuiScale();
+		McCanvas canvas = new McCanvas(g, this.font, guiScale);
 		canvas.begin();
 		try {
-			gui.frame(canvas, this.width, this.height, mouseX, mouseY, down, pressed, rightPressed, dt);
+			// A click shorter than one frame still counts as held for that frame (sliders, colour picker).
+			gui.frame(canvas, this.width, this.height, guiScale, mouseX, mouseY, down || pressed, pressed, rightPressed, dt);
 		} finally {
 			canvas.end();
 		}
 		pressed = false;
 		rightPressed = false;
+		if (releaseQueued) {
+			down = false;
+			releaseQueued = false;
+		}
+		if (dirty && now / 1_000_000L - lastSave > 500) flush();
+	}
+
+	private void flush() {
+		dirty = false;
+		lastSave = System.nanoTime() / 1_000_000L;
+		OnyxConfig.get().save();
+	}
+
+	/** Test hook: puts the cursor at the first card and clicks it. */
+	public void debugClickFirstCard() {
+		fakeX = Math.round(gui.firstCardX);
+		fakeY = Math.round(gui.firstCardY);
+		pressed = true;
+		down = true;
+		releaseQueued = true;
 	}
 
 	@Override
@@ -63,13 +95,13 @@ public final class ClickGuiScreen extends Screen {
 
 	@Override
 	public boolean mouseReleased(MouseButtonEvent event) {
-		if (event.button() == 0) down = false;
+		if (event.button() == 0) releaseQueued = true;
 		return true;
 	}
 
 	@Override
 	public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
-		return gui.mouseScrolled(mouseX, mouseY, scrollY) || super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
+		return gui.mouseScrolled(fakeX != Integer.MIN_VALUE ? fakeX : mouseX, fakeX != Integer.MIN_VALUE ? fakeY : mouseY, scrollY) || super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
 	}
 
 	@Override
@@ -91,7 +123,7 @@ public final class ClickGuiScreen extends Screen {
 
 	@Override
 	public void onClose() {
-		OnyxConfig.get().save();
+		flush();
 		super.onClose();
 	}
 }

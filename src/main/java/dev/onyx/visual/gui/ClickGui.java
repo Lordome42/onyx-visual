@@ -34,7 +34,9 @@ public final class ClickGui {
 	private final Set<String> favorites = new HashSet<>();
 	private String search = "";
 	private float scrollOffset, scrollTarget, maxScroll;
-	private float width, height;
+	private float width, height, gs = 2;
+	/** Last drawn position of the first card (GUI units); used by in-game tests. */
+	public float firstCardX = -1, firstCardY = -1;
 
 	public ClickGui(List<Category> categories, GuiPrefs prefs, Binds binds, Runnable save) {
 		this.categories = categories;
@@ -51,12 +53,13 @@ public final class ClickGui {
 	public boolean capturingKeys() { return bindingModule != null || searchFocused; }
 
 	/** One frame: draw everything and react to the mouse. */
-	public void frame(UiCanvas ui, float width, float height, int mouseX, int mouseY, boolean down, boolean pressed, boolean rightPressed, float dt) {
+	public void frame(UiCanvas ui, float width, float height, float guiScale, int mouseX, int mouseY, boolean down, boolean pressed, boolean rightPressed, float dt) {
 		this.width = width;
 		this.height = height;
+		this.gs = Math.max(1, guiScale);
 		for (Category c : categories) for (Module m : c.modules()) m.refresh();
 		open.update(dt, 9);
-		Layout l = Layout.create(width, height, prefs.scale / 100f);
+		Layout l = Layout.create(width, height, prefs.scale / 100f, gs);
 		boolean popupWasOpen = settings.popupOpen();
 		settings.dismissOutside(mouseX, mouseY, pressed);
 		boolean basePressed = pressed && !popupWasOpen, baseDown = down && !popupWasOpen, baseRightPressed = rightPressed && !popupWasOpen;
@@ -206,6 +209,10 @@ public final class ClickGui {
 		for (int i = 0; i < visible.size(); i++) {
 			Module m = visible.get(i);
 			int column = i % columns;
+			if (i == 0) {
+				firstCardX = l.mainX + 40 * l.s;
+				firstCardY = ys[0] + 16 * l.s;
+			}
 			float x = l.mainX + column * (columnW + gap), y = ys[column];
 			float baseH = CardRenderer.baseHeight(m, l.s), settingsH = expandedModules.contains(m) ? SettingsPanel.height(m, l.s) : 0;
 			float cardH = baseH + settingsH;
@@ -300,7 +307,7 @@ public final class ClickGui {
 	}
 
 	public boolean mouseScrolled(double mouseX, double mouseY, double amount) {
-		Layout l = Layout.create(width, height, prefs.scale / 100f);
+		Layout l = Layout.create(width, height, prefs.scale / 100f, gs);
 		if (hit((float) mouseX, (float) mouseY, l.mainX, l.y + 119 * l.s, l.mainW, l.h - 131 * l.s)) {
 			scrollTarget = Math.max(0, Math.min(maxScroll, scrollTarget - (float) amount * 36 * l.s));
 			settings.closePopups();
@@ -310,10 +317,11 @@ public final class ClickGui {
 	}
 
 	private record Layout(float x, float y, float w, float h, float s, float side, float mainX, float mainW) {
-		static Layout create(float sw, float sh, float userScale) {
-			float designW = 900, designH = 550, margin = 18;
+		/** The panel is sized in real screen pixels: up to 1.45 px per design unit, so text stays readable at any GUI scale. */
+		static Layout create(float sw, float sh, float userScale, float gs) {
+			float designW = 900, designH = 550, margin = 14;
 			float fitScale = Math.min((sw - margin * 2) / designW, (sh - margin * 2) / designH);
-			float s = Math.max(.10f, Math.min(.62f * userScale, fitScale));
+			float s = Math.max(.10f, Math.min(1.45f * userScale / gs, fitScale));
 			float w = designW * s, h = designH * s;
 			float x = (sw - w) / 2, y = (sh - h) / 2, side = 0, mainX = x + 17 * s;
 			return new Layout(x, y, w, h, s, side, mainX, x + w - mainX - 17 * s);

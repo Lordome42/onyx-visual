@@ -22,12 +22,31 @@ public class OnyxClientTest implements FabricClientGameTest {
 			context.waitForScreen(dev.onyx.visual.gui.ClickGuiScreen.class);
 			context.waitTicks(10);
 			context.takeScreenshot("onyx-clickgui");
-			boolean birdsBefore = context.computeOnClient(mc -> OnyxConfig.get().birds);
-			context.runOnClient(mc -> dev.onyx.visual.gui.OnyxModules.toggle(OnyxConfig.get(), "birds"));
-			boolean birdsAfter = context.computeOnClient(mc -> OnyxConfig.get().birds);
-			if (birdsBefore == birdsAfter) {
-				throw new AssertionError("Toggling a module did not change its option");
+			// A real click on the first card must flip its option, and the menu must stay readable at every GUI scale.
+			boolean auroraBefore = context.computeOnClient(mc -> OnyxConfig.get().aurora);
+			context.runOnClient(mc -> ((dev.onyx.visual.gui.ClickGuiScreen) mc.gui.screen()).debugClickFirstCard());
+			context.waitTicks(6);
+			boolean auroraAfter = context.computeOnClient(mc -> OnyxConfig.get().aurora);
+			if (auroraBefore == auroraAfter) {
+				throw new AssertionError("Clicking the first card did not toggle its option");
 			}
+			context.runOnClient(mc -> ((dev.onyx.visual.gui.ClickGuiScreen) mc.gui.screen()).debugClickFirstCard());
+			context.waitTicks(6);
+			for (int scale = 1; scale <= 4; scale++) {
+				final int gs = scale;
+				context.runOnClient(mc -> {
+					mc.options.guiScale().set(gs);
+					mc.getWindow().setGuiScale(mc.getWindow().calculateScale(gs, mc.isEnforceUnicode()));
+					mc.resizeGui();
+				});
+				context.waitTicks(8);
+				context.takeScreenshot("onyx-clickgui-scale" + gs);
+			}
+			context.runOnClient(mc -> {
+				mc.options.guiScale().set(0);
+				mc.getWindow().setGuiScale(mc.getWindow().calculateScale(0, mc.isEnforceUnicode()));
+				mc.resizeGui();
+			});
 			context.runOnClient(mc -> OnyxConfig.get().birds = true);
 			context.setScreen(() -> null);
 

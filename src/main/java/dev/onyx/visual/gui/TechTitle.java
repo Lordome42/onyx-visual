@@ -94,15 +94,10 @@ final class TechTitle {
     }
 
     private static void dashedGlyph(UiCanvas ui,String glyph,float x,float width,float y,float size,float scale,float alpha){
-        float dash=Math.max(.7f,4*scale),gap=Math.max(.4f,2*scale);
         float offset=Math.max(.5f,1.2f*scale);
-        int color=withAlpha(WHITE,alpha*.95f);
-        for(float slice=0;slice<width;slice+=dash+gap){
-            ui.pushScissor(x+slice-offset,y-size*.75f,Math.min(dash,width-slice)+offset*2,size*1.5f);
-            ui.strongText(x-offset,y,size,color,glyph).strongText(x+offset,y,size,color,glyph)
-              .strongText(x,y-offset,size,color,glyph).strongText(x,y+offset,size,color,glyph);
-            ui.popScissor();
-        }
+        int color=withAlpha(WHITE,alpha*.9f);
+        ui.strongText(x-offset,y,size,color,glyph).strongText(x+offset,y,size,color,glyph)
+          .strongText(x,y-offset,size,color,glyph).strongText(x,y+offset,size,color,glyph);
         ui.strongText(x,y,size,withAlpha(0xFF0B0B0C,alpha),glyph);
     }
     private static void drawFrame(UiCanvas ui,Glyph g,float cy,float size,float scale,float alpha,float time){

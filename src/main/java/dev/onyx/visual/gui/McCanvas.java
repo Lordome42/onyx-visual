@@ -13,23 +13,35 @@ import net.minecraft.network.chat.Style;
  * blocky GUI-pixel grid. Text and icons use TrueType fonts shipped in the jar, picked by size bucket.
  */
 public final class McCanvas implements UiCanvas {
-	/** TrueType font sizes (in pixels) shipped as separate font definitions: ui_N / bold_N / icons_N. */
-	static final int[] BUCKETS = {8, 11, 15, 21, 29, 40, 56};
+	/** Fonts exist for every whole pixel size from MIN_PX to MAX_PX: ui_N, bold_N, icons_N (1 font pixel = 1 screen pixel). */
+	static final int MIN_PX = 6, MAX_PX = 64;
 	private static final float CAP_HEIGHT = 0.7275f; // Inter cap height / em
+	private static final int KIND_UI = 0, KIND_BOLD = 1, KIND_ICON = 2;
+	private static final String[] KIND_NAME = {"ui_", "bold_", "icons_"};
+	private static final Style[][] STYLES = new Style[3][MAX_PX + 1];
+
+	private record Key(int kind, int px, String text) {}
+	private static final java.util.HashMap<Key, Component> COMPONENTS = new java.util.HashMap<>();
+	private static final java.util.HashMap<Key, Integer> WIDTHS = new java.util.HashMap<>();
+	private static final java.util.HashMap<String, String> FITS = new java.util.HashMap<>();
 
 	private final GuiGraphicsExtractor g;
 	private final Font font;
 	private final float gs;
 	private int scissorDepth;
 
-	private static final Style[] UI = new Style[BUCKETS.length], BOLD = new Style[BUCKETS.length], ICONS = new Style[BUCKETS.length];
-
-	static {
-		for (int i = 0; i < BUCKETS.length; i++) {
-			UI[i] = Style.EMPTY.withFont(new FontDescription.Resource(OnyxVisual.id("ui_" + BUCKETS[i])));
-			BOLD[i] = Style.EMPTY.withFont(new FontDescription.Resource(OnyxVisual.id("bold_" + BUCKETS[i])));
-			ICONS[i] = Style.EMPTY.withFont(new FontDescription.Resource(OnyxVisual.id("icons_" + BUCKETS[i])));
+	private static Style style(int kind, int px) {
+		Style st = STYLES[kind][px];
+		if (st == null) {
+			st = Style.EMPTY.withFont(new FontDescription.Resource(OnyxVisual.id(KIND_NAME[kind] + px)));
+			STYLES[kind][px] = st;
 		}
+		return st;
+	}
+
+	private static Component component(int kind, int px, String text) {
+		if (COMPONENTS.size() > 6000) COMPONENTS.clear();
+		return COMPONENTS.computeIfAbsent(new Key(kind, px, text), k -> Component.literal(text).withStyle(style(kind, px)));
 	}
 
 	public McCanvas(GuiGraphicsExtractor g, Font font, float guiScale) {
@@ -118,8 +130,17 @@ public final class McCanvas implements UiCanvas {
 		if (bottom <= top) return this;
 		R = Math.max(0, Math.min(R, Math.min(W, bottom - top) / 2f));
 		float iR = Math.max(0, R - S);
-		int is = Math.round(S);
+		int is = Math.max(1, Math.round(S));
+		int rr = (int) Math.ceil(R);
+		int mid0 = top + Math.max(rr, is), mid1 = bottom - Math.max(rr, is);
 		for (int row = top; row < bottom; row++) {
+			if (row >= mid0 && row < mid1) {
+				// straight section: both side strips in one call each, for all remaining rows
+				span0(row, mid1, X, X + S, color);
+				span0(row, mid1, X + W - S, X + W, color);
+				row = mid1 - 1;
+				continue;
+			}
 			float cyTop = row + 0.5f - top, cyBot = bottom - (row + 0.5f);
 			float d = Math.min(cyTop, cyBot);
 			float out = d < R ? inset(R, R - d) : 0;
@@ -130,9 +151,8 @@ public final class McCanvas implements UiCanvas {
 			}
 			float di = d - S;
 			float in = di < iR ? inset(iR, iR - di) : 0;
-			float il = X + S + in, ir = X + W - S - in;
-			span(row, ol, il, color);
-			span(row, ir, or, color);
+			span(row, ol, X + S + in, color);
+			span(row, X + W - S - in, or, color);
 		}
 		return this;
 	}
@@ -224,49 +244,83 @@ public final class McCanvas implements UiCanvas {
 
 	// ------------------------------------------------------------------ text
 
-	private static int bucket(float px) {
-		for (int i = 0; i < BUCKETS.length; i++) if (BUCKETS[i] >= px - 0.5f) return i;
-		return BUCKETS.length - 1;
+	private static int pixelSize(float guiSize, float gs) {
+		return Math.max(MIN_PX, Math.min(MAX_PX, Math.round(guiSize * gs)));
 	}
 
-	private void drawText(Style[] styles, float x, float cy, float size, int color, String text, boolean icon) {
+	private void drawText(int kind, float x, float cy, float size, int color, String text) {
 		if (text.isEmpty() || (color >>> 24) < 5) return;
-		float P = size * gs;
-		int b = bucket(P);
-		float k = P / BUCKETS[b];
-		float baseline = icon ? cy * gs + P / 2 : cy * gs + P * CAP_HEIGHT / 2;
-		g.pose().pushMatrix();
-		g.pose().translate(x * gs, baseline - 7 * k);
-		g.pose().scale(k, k);
-		g.text(font, Component.literal(text).withStyle(styles[b]), 0, 0, color, false);
-		g.pose().popMatrix();
+		int P = pixelSize(size, gs);
+		boolean icon = kind == KIND_ICON;
+		float baseline = icon ? cy * gs + P / 2f : cy * gs + P * CAP_HEIGHT / 2f;
+		// Whole pixels only: fractional text positions are what made the text blurry.
+		int px = Math.round(icon ? x * gs : x * gs);
+		int py = Math.round(baseline) - 7; // the font baseline sits 7 units below a glyph's top
+		g.text(font, component(kind, P, text), px, py, color, false);
 	}
 
 	@Override
 	public UiCanvas icon(float cx, float cy, float size, int color, int codepoint) {
-		drawText(ICONS, cx - size / 2, cy, size, color, new String(Character.toChars(codepoint)), true);
+		int P = pixelSize(size, gs);
+		drawText(KIND_ICON, cx - (P / gs) / 2f, cy, size, color, new String(Character.toChars(codepoint)));
 		return this;
 	}
 
 	@Override
 	public UiCanvas text(float x, float cy, float size, int color, String text) {
-		drawText(UI, x, cy, size, color, text, false);
+		drawText(KIND_UI, x, cy, size, color, text);
 		return this;
 	}
 
 	@Override
 	public UiCanvas strongText(float x, float cy, float size, int color, String text) {
-		drawText(BOLD, x, cy, size, color, text, false);
+		drawText(KIND_BOLD, x, cy, size, color, text);
 		return this;
 	}
 
 	@Override
 	public float textWidth(String text, float size, boolean strong) {
 		if (text.isEmpty()) return 0;
-		float P = size * gs;
-		int b = bucket(P);
-		int units = font.width(Component.literal(text).withStyle((strong ? BOLD : UI)[b]));
-		return units * (P / BUCKETS[b]) / gs;
+		int P = pixelSize(size, gs);
+		int kind = strong ? KIND_BOLD : KIND_UI;
+		if (WIDTHS.size() > 6000) WIDTHS.clear();
+		Key key = new Key(kind, P, text);
+		Integer w = WIDTHS.get(key);
+		if (w == null) {
+			w = font.width(component(kind, P, text));
+			WIDTHS.put(key, w);
+		}
+		return w / gs;
+	}
+
+	@Override
+	public String fit(String text, float size, boolean strong, float maxWidth) {
+		String k = pixelSize(size, gs) + (strong ? "b" : "u") + Math.round(maxWidth * gs) + ":" + text;
+		String hit = FITS.get(k);
+		if (hit != null) return hit;
+		if (FITS.size() > 3000) FITS.clear();
+		String out = UiCanvas.super.fit(text, size, strong, maxWidth);
+		FITS.put(k, out);
+		return out;
+	}
+
+	@Override
+	public UiCanvas coarseShape(int shape, float cx, float cy, float r, int color) {
+		float X = cx * gs, Y = cy * gs, R = r * gs;
+		switch (shape) {
+			case 0 -> fillPx(Math.round(X - R), Math.round(Y - R), Math.round(X + R), Math.round(Y + R), color);
+			case 1 -> {
+				fillPx(Math.round(X - R), Math.round(Y - R * .5f), Math.round(X + R), Math.round(Y + R * .5f), color);
+				fillPx(Math.round(X - R * .6f), Math.round(Y - R), Math.round(X + R * .6f), Math.round(Y - R * .5f), color);
+				fillPx(Math.round(X - R * .6f), Math.round(Y + R * .5f), Math.round(X + R * .6f), Math.round(Y + R), color);
+			}
+			default -> {
+				fillPx(Math.round(X - R * .25f), Math.round(Y - R), Math.round(X + R * .25f), Math.round(Y - R * .33f), color);
+				fillPx(Math.round(X - R * .62f), Math.round(Y - R * .33f), Math.round(X + R * .62f), Math.round(Y + R * .33f), color);
+				fillPx(Math.round(X - R), Math.round(Y + R * .33f), Math.round(X + R), Math.round(Y + R), color);
+			}
+		}
+		return this;
 	}
 
 	// ------------------------------------------------------------------ scissor

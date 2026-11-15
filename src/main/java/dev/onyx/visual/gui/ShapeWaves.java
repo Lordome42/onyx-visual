@@ -69,6 +69,7 @@ final class ShapeWaves {
             int rgb=mix(0x929292,0xFFFFFF,smoothstep(.15f,.85f,charge));
             int color=((int)(clamp(alpha,0,.88f)*255)<<24)|rgb;
             if(charge>.55f)ui.circle(x,y,size*1.65f,((int)(charge*18)<<24)|0xFFFFFF);
+            if(charge<.08f){ui.coarseShape(shape,x,y,size,color);continue;}
             if(shape==0)ui.rect(x-size,y-size,size*2,size*2,color);
             else if(shape==1)ui.circle(x,y,size,color);
             else ui.triangle(x,y-size,x-size,y+size,x+size,y+size,color);
@@ -78,7 +79,7 @@ final class ShapeWaves {
     private void configure(float width,float height){
         if(width==screenWidth&&height==screenHeight)return;
         screenWidth=width;screenHeight=height;
-        cell=Math.max(10f,(float)Math.sqrt(width*height/6000f));
+        cell=Math.max(13f,(float)Math.sqrt(width*height/1700f));
         cols=Math.max(1,Math.round(width/cell));cell=width/cols;
         rows=Math.max(1,(int)(height/cell));
         gridX=0;gridY=(height-rows*cell)*.5f;
