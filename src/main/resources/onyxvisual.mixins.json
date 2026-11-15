@@ -1,0 +1,7 @@
+{
+	"required": true,
+	"package": "dev.onyx.visual.mixin",
+	"compatibilityLevel": "JAVA_25",
+	"client": ["CameraMixin", "ContainerScreenAccessor"],
+	"injectors": { "defaultRequire": 0 }
+}

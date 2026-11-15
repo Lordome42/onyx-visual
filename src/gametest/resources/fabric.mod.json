@@ -1,0 +1,11 @@
+{
+	"schemaVersion": 1,
+	"id": "onyxvisual-test",
+	"version": "1.0.0",
+	"name": "Onyx Visual Test",
+	"environment": "client",
+	"entrypoints": {
+		"fabric-client-gametest": ["dev.onyx.visual.test.OnyxClientTest"]
+	},
+	"depends": { "onyxvisual": "*" }
+}
