@@ -86,6 +86,20 @@ public class OnyxClientTest implements FabricClientGameTest {
 			context.runOnClient(mc -> mc.gui.setScreen(new net.minecraft.client.gui.screens.ChatScreen("", false)));
 			context.waitTicks(10);
 			context.takeScreenshot("onyx-hud-edit");
+			// Dragging the FPS widget with the (simulated) mouse moves it and stores the offset.
+			context.runOnClient(mc -> OnyxConfig.get().hudPos.clear());
+			dev.onyx.visual.hud.HudLayout.testInput = new double[]{20, 58, 0};
+			context.waitTicks(3);
+			dev.onyx.visual.hud.HudLayout.testInput = new double[]{20, 58, 1};
+			context.waitTicks(3);
+			dev.onyx.visual.hud.HudLayout.testInput = new double[]{120, 128, 1};
+			context.waitTicks(3);
+			dev.onyx.visual.hud.HudLayout.testInput = new double[]{120, 128, 0};
+			context.waitTicks(3);
+			int[] dragged = context.computeOnClient(mc -> OnyxConfig.get().hudPos.get("stats"));
+			dev.onyx.visual.hud.HudLayout.testInput = null;
+			if (dragged == null || dragged[0] < 50 || dragged[1] < 50) throw new AssertionError("HUD drag did not move the widget");
+			context.takeScreenshot("onyx-hud-moved");
 			context.setScreen(() -> null);
 
 			// ---- On-screen widgets.

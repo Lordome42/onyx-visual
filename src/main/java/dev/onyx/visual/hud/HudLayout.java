@@ -18,6 +18,8 @@ import net.minecraft.network.chat.Component;
 public final class HudLayout {
 	public static final String[] IDS = {"info", "stats", "gear", "compass", "look", "schematic", "titles", "keys", "flight"};
 	private static final Map<String, int[]> REPORTED = new HashMap<>();
+	/** Test hook: {x, y, buttonDown} in GUI units replaces the real mouse. */
+	public static volatile double[] testInput;
 	private static String dragging;
 	private static float grabX, grabY;
 	private static boolean wasDown;
@@ -93,9 +95,17 @@ public final class HudLayout {
 		}
 		int w = g.guiWidth(), h = g.guiHeight();
 		var window = mc.getWindow();
-		double mx = mc.mouseHandler.xpos() * window.getGuiScaledWidth() / window.getScreenWidth();
-		double my = mc.mouseHandler.ypos() * window.getGuiScaledHeight() / window.getScreenHeight();
-		boolean down = mc.mouseHandler.isLeftPressed();
+		// Poll GLFW directly: the game's own "left pressed" flag is not kept up to date while a screen is open.
+		double[] cx = new double[1], cy = new double[1];
+		org.lwjgl.glfw.GLFW.glfwGetCursorPos(window.handle(), cx, cy);
+		double mx = cx[0] * window.getGuiScaledWidth() / window.getScreenWidth();
+		double my = cy[0] * window.getGuiScaledHeight() / window.getScreenHeight();
+		boolean down = org.lwjgl.glfw.GLFW.glfwGetMouseButton(window.handle(), 0) == 1;
+		if (testInput != null) {
+			mx = testInput[0];
+			my = testInput[1];
+			down = testInput[2] > 0;
+		}
 		OnyxConfig config = OnyxConfig.get();
 		Map<String, int[]> rects = new LinkedHashMap<>();
 		for (String id : IDS) {
