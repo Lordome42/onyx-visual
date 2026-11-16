@@ -256,5 +256,21 @@
 	"onyxvisual.hud.w.schematic": "Схема",
 	"onyxvisual.hud.w.titles": "Заголовки",
 	"onyxvisual.hud.w.keys": "Клавиши",
-	"onyxvisual.hud.w.flight": "Полёт"
+	"onyxvisual.hud.w.flight": "Полёт",
+	"onyxvisual.gui.theme": "Тема меню",
+	"onyxvisual.gui.theme.hint": "Цветовая схема окна",
+	"onyxvisual.gui.accent_preset": "Акцент",
+	"onyxvisual.gui.accent_preset.hint": "Готовые цвета акцента, свой цвет ниже",
+	"onyxvisual.gui.theme.0": "Оникс",
+	"onyxvisual.gui.theme.1": "Полночь",
+	"onyxvisual.gui.theme.2": "Лес",
+	"onyxvisual.gui.theme.3": "Слива",
+	"onyxvisual.gui.theme.4": "Уголь",
+	"onyxvisual.gui.theme.5": "Амолед",
+	"onyxvisual.gui.accent.0": "Розовый",
+	"onyxvisual.gui.accent.1": "Фиолетовый",
+	"onyxvisual.gui.accent.2": "Мятный",
+	"onyxvisual.gui.accent.3": "Янтарный",
+	"onyxvisual.gui.accent.4": "Красный",
+	"onyxvisual.gui.accent.5": "Белый"
 }

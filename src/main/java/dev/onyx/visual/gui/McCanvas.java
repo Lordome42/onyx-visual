@@ -75,7 +75,7 @@ public final class McCanvas implements UiCanvas {
 	private void fillPx(int x0, int y0, int x1, int y1, int color) {
 		if (x1 <= x0 || y1 <= y0 || (color >>> 24) == 0) return;
 		statFills++;
-		g.fill(x0, y0, x1, y1, color);
+		g.fill(x0, y0, x1, y1, Theme.apply(color));
 	}
 
 	/** Fills one pixel row between two fractional x positions with coverage-based edge pixels. */
@@ -332,7 +332,7 @@ public final class McCanvas implements UiCanvas {
 		int px = Math.round(icon ? x * gs : x * gs);
 		int py = Math.round(baseline) - 7; // the font baseline sits 7 units below a glyph's top
 		statTexts++;
-		g.text(font, component(kind, P, text), px, py, color, false);
+		g.text(font, component(kind, P, text), px, py, Theme.apply(color), false);
 	}
 
 	@Override

@@ -88,7 +88,7 @@ public final class ClickGui {
 	}
 
 	private void backdrop(UiCanvas ui, Layout l, int mx, int my, boolean down, boolean pressed, float dt) {
-		int bg = prefs.dim ? 0xF8120F17 : 0xB8120F17;
+		int bg = Theme.apply(prefs.dim ? 0xF8120F17 : 0xB8120F17);
 		shapeWaves.draw(ui, width, height, mx, my, dt, prefs.waves && !ui.lite(), Colors.fade(bg, .35f + .65f * open.value()));
 		for (int i = ui.lite() ? 0 : 3; i > 0; i--) {
 			float spread = i * 2.2f * l.s;

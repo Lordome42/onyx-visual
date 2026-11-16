@@ -71,6 +71,7 @@ public final class ClickGuiScreen extends Screen {
 		if (perf == null) perf = new PerfLog(guiScale, this.width, this.height, window.getWidth(), window.getHeight(), lite);
 		double frameMs = lastRealFrame == 0 ? 0 : (now - lastRealFrame) / 1e6;
 		lastRealFrame = now;
+		Theme.current = OnyxConfig.get().gui.theme;
 		McCanvas.statFills = 0;
 		McCanvas.statTexts = 0;
 		McCanvas canvas = new McCanvas(g, this.font, guiScale, lite);

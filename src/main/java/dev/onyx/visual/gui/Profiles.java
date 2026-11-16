@@ -82,6 +82,10 @@ public final class Profiles {
 				settings.add(f.getName(), GSON.toJsonTree(f.get(config)));
 			}
 			o.add("settings", settings);
+			JsonObject look = new JsonObject();
+			look.addProperty("theme", config.gui.theme);
+			look.addProperty("accent", config.gui.accent);
+			o.add("gui", look);
 			try (Writer w = Files.newBufferedWriter(dir().resolve(fileName(name)), StandardCharsets.UTF_8)) {
 				GSON.toJson(o, w);
 			}
@@ -95,7 +99,14 @@ public final class Profiles {
 	/** Applies a profile to the live config and saves it. */
 	public static boolean load(Info info, OnyxConfig config) {
 		try (Reader reader = Files.newBufferedReader(dir().resolve(info.file()), StandardCharsets.UTF_8)) {
-			JsonObject settings = JsonParser.parseReader(reader).getAsJsonObject().getAsJsonObject("settings");
+			JsonObject root = JsonParser.parseReader(reader).getAsJsonObject();
+			JsonObject settings = root.getAsJsonObject("settings");
+			if (root.has("gui")) {
+				JsonObject look = root.getAsJsonObject("gui");
+				if (look.has("theme")) config.gui.theme = look.get("theme").getAsInt();
+				if (look.has("accent")) config.gui.accent = look.get("accent").getAsInt();
+				config.gui.sanitize();
+			}
 			for (Field f : OnyxConfig.class.getFields()) {
 				if (!included(f)) continue;
 				JsonElement v = settings.get(f.getName());

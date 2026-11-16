@@ -256,5 +256,21 @@
 	"onyxvisual.hud.w.schematic": "Schematic",
 	"onyxvisual.hud.w.titles": "Titles",
 	"onyxvisual.hud.w.keys": "Keys",
-	"onyxvisual.hud.w.flight": "Flight"
+	"onyxvisual.hud.w.flight": "Flight",
+	"onyxvisual.gui.theme": "Menu theme",
+	"onyxvisual.gui.theme.hint": "Colour scheme of the window",
+	"onyxvisual.gui.accent_preset": "Accent",
+	"onyxvisual.gui.accent_preset.hint": "Ready accent colours, custom colour below",
+	"onyxvisual.gui.theme.0": "Onyx",
+	"onyxvisual.gui.theme.1": "Midnight",
+	"onyxvisual.gui.theme.2": "Forest",
+	"onyxvisual.gui.theme.3": "Plum",
+	"onyxvisual.gui.theme.4": "Ember",
+	"onyxvisual.gui.theme.5": "OLED",
+	"onyxvisual.gui.accent.0": "Pink",
+	"onyxvisual.gui.accent.1": "Violet",
+	"onyxvisual.gui.accent.2": "Mint",
+	"onyxvisual.gui.accent.3": "Amber",
+	"onyxvisual.gui.accent.4": "Red",
+	"onyxvisual.gui.accent.5": "White"
 }

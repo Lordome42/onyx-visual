@@ -62,6 +62,13 @@ public class OnyxClientTest implements FabricClientGameTest {
 				mc.getWindow().setGuiScale(mc.getWindow().calculateScale(0, mc.isEnforceUnicode()));
 				mc.resizeGui();
 			});
+			for (int th = 1; th <= 5; th++) {
+				final int theme = th;
+				context.runOnClient(mc -> { OnyxConfig.get().gui.theme = theme; OnyxConfig.get().gui.accent = dev.onyx.visual.gui.GuiPrefs.ACCENTS[theme % 6]; });
+				context.waitTicks(6);
+				context.takeScreenshot("onyx-theme" + th);
+			}
+			context.runOnClient(mc -> { OnyxConfig.get().gui.theme = 0; OnyxConfig.get().gui.accent = dev.onyx.visual.gui.GuiPrefs.ACCENTS[0]; });
 			// Configs page: save a profile, change a setting, load it back.
 			context.runOnClient(mc -> {
 				OnyxConfig c = OnyxConfig.get();

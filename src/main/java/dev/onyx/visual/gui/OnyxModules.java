@@ -81,13 +81,32 @@ public final class OnyxModules {
 		GuiPrefs p = config.gui;
 		List<Module> modules = new ArrayList<>();
 		modules.add(new Module("gui.dim", Tr.get("m.dim"), Tr.get("m.dim.desc"), () -> p.dim, v -> { p.dim = v; save.run(); },
-				List.of(new ColorValue(Tr.get("accent"), Tr.get("accent.hint"), () -> p.accent, v -> { p.accent = v | 0xFF000000; save.run(); }),
+				List.of(new Choice(Tr.get("theme"), Tr.get("theme.hint"), themeNames(), () -> p.theme, i -> { p.theme = i; save.run(); }),
+						new Choice(Tr.get("accent_preset"), Tr.get("accent_preset.hint"), accentNames(), () -> accentIndex(p), i -> { p.accent = GuiPrefs.ACCENTS[i]; save.run(); }),
+						new ColorValue(Tr.get("accent"), Tr.get("accent.hint"), () -> p.accent, v -> { p.accent = v | 0xFF000000; save.run(); }),
 						new Slider(Tr.get("scale"), Tr.get("scale.hint"), 70, 130, 5, "%", () -> p.scale, v -> { p.scale = (float) v; save.run(); }),
 						new Key(Tr.get("open_key"), Tr.get("open_key.hint"), openKeyLabel))));
 		modules.add(new Module("gui.waves", Tr.get("m.waves"), Tr.get("m.waves.desc"), () -> p.waves, v -> { p.waves = v; save.run(); }, List.of()));
 		modules.add(new Module("gui.lite", Tr.get("m.lite"), Tr.get("m.lite.desc"), () -> p.lite, v -> { p.lite = v; save.run(); }, List.of()));
 		modules.add(new Module("gui.title", Tr.get("m.title"), Tr.get("m.title.desc"), () -> p.title, v -> { p.title = v; save.run(); }, List.of()));
 		return new Category("menu", Tr.raw("onyxvisual.cat.menu"), Tr.raw("onyxvisual.catdesc.menu"), 0xE8B8, modules);
+	}
+
+	private static List<String> themeNames() {
+		List<String> names = new ArrayList<>();
+		for (int i = 0; i < Theme.COUNT; i++) names.add(Tr.raw("onyxvisual.gui.theme." + i));
+		return names;
+	}
+
+	private static List<String> accentNames() {
+		List<String> names = new ArrayList<>();
+		for (int i = 0; i < GuiPrefs.ACCENTS.length; i++) names.add(Tr.raw("onyxvisual.gui.accent." + i));
+		return names;
+	}
+
+	private static int accentIndex(GuiPrefs p) {
+		for (int i = 0; i < GuiPrefs.ACCENTS.length; i++) if ((GuiPrefs.ACCENTS[i] | 0xFF000000) == (p.accent | 0xFF000000)) return i;
+		return 0;
 	}
 
 	private static boolean get(Field f, Object o) {
