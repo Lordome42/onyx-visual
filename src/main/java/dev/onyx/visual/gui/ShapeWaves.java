@@ -17,8 +17,8 @@ final class ShapeWaves {
 
     /** @param animated false = only the flat backdrop (setting "Фон меню" off). */
     void draw(UiCanvas ui,float width,float height,int mx,int my,float dt,boolean animated,int background){
-        ui.rect(0,0,width,height,background);
-        if(width<=0||height<=0||!animated)return;
+        if(width<=0||height<=0)return;
+        if(!animated){ui.rect(0,0,width,height,background);return;}
         configure(width,height);
         dt=Math.max(0,Math.min(.05f,dt));
         introTime=Math.min(1.6f,introTime+dt);
@@ -51,7 +51,29 @@ final class ShapeWaves {
                 java.util.Arrays.fill(charges,0);active=false;simulationBacklog=0;
             }
         }
+        boolean animating=active||introTime<1.6f;
+        int maxW=ui.lite()?240:480;
+        int tw=Math.max(32,Math.min(maxW,Math.round(width))),th=Math.max(18,Math.round(tw*height/width));
+        boolean fresh=buffer==null||bufW!=tw||bufH!=th||lastBackground!=background;
+        if(fresh){buffer=new int[tw*th];bufW=tw;bufH=th;lastBackground=background;}
+        if(fresh||animating||dirtyOnce){
+            dirtyOnce=false;
+            java.util.Arrays.fill(buffer,background);
+            rasterize(width,height,tw,th);
+            changed=true;
+        }
+        if(ui.blitPixels(buffer,tw,th,changed,0,0,width,height))changed=false;
+        else ui.rect(0,0,width,height,background);
+    }
+
+    private int[] buffer;
+    private int bufW,bufH,lastBackground;
+    private boolean changed=true,dirtyOnce=true;
+
+    /** Software-renders the cell grid into a small ARGB buffer; one texture blit replaces thousands of fills. */
+    private void rasterize(float width,float height,int tw,int th){
         float introProgress=introTime/1.6f;
+        float kx=tw/width,ky=th/height;
         for(int row=0;row<rows;row++)for(int col=0;col<cols;col++){
             int id=row*cols+col;
             float x=gridX+(col+.5f)*cell,y=gridY+(row+.5f)*cell;
@@ -68,11 +90,40 @@ final class ShapeWaves {
             float size=cell*.375f*(1+charge*.22f)*(.55f+.45f*reveal);
             int rgb=mix(0x929292,0xFFFFFF,smoothstep(.15f,.85f,charge));
             int color=((int)(clamp(alpha,0,.88f)*255)<<24)|rgb;
-            if(charge>.55f)ui.circle(x,y,size*1.65f,((int)(charge*18)<<24)|0xFFFFFF);
-            if(charge<.08f){ui.coarseShape(shape,x,y,size,color);continue;}
-            if(shape==0)ui.rect(x-size,y-size,size*2,size*2,color);
-            else if(shape==1)ui.circle(x,y,size,color);
-            else ui.triangle(x,y-size,x-size,y+size,x+size,y+size,color);
+            if(charge>.55f)blob(tw,th,x*kx,y*ky,size*1.65f*kx,size*1.65f*ky,1,((int)(charge*18)<<24)|0xFFFFFF);
+            blob(tw,th,x*kx,y*ky,size*kx,size*ky,shape,color);
+        }
+    }
+
+    /** shape: 0 square, 1 ellipse, 2 triangle (apex up); half sizes rx, ry in texels. */
+    private void blob(int tw,int th,float cx,float cy,float rx,float ry,int shape,int color){
+        int x0=Math.max(0,(int)Math.floor(cx-rx)),x1=Math.min(tw-1,(int)Math.ceil(cx+rx));
+        int y0=Math.max(0,(int)Math.floor(cy-ry)),y1=Math.min(th-1,(int)Math.ceil(cy+ry));
+        int sa=color>>>24,sr=(color>>16)&255,sg=(color>>8)&255,sb=color&255;
+        for(int j=y0;j<=y1;j++){
+            float py=(j+.5f-cy)/ry;
+            for(int i=x0;i<=x1;i++){
+                float px=(i+.5f-cx)/rx;
+                float cover;
+                if(shape==0)cover=Math.min(1,Math.min((1-Math.abs(px))*rx+.5f,(1-Math.abs(py))*ry+.5f));
+                else if(shape==1)cover=clamp((1-(float)Math.sqrt(px*px+py*py))*Math.min(rx,ry)+.5f,0,1);
+                else{
+                    float t=(py+1)*.5f; // 0 at the apex, 1 at the base
+                    float half=t;       // half-width relative to rx
+                    cover=Math.min(1,Math.min((half-Math.abs(px))*rx+.5f,Math.min((1-Math.abs(py))*ry+.5f,1)));
+                }
+                if(cover<=0)continue;
+                int a=Math.round(sa*cover);
+                if(a<=0)continue;
+                int idx=j*tw+i,d=buffer[idx];
+                int da=d>>>24;
+                int oa=a+da*(255-a)/255;
+                if(oa<=0)continue;
+                int dr=(d>>16)&255,dg=(d>>8)&255,db=d&255;
+                int wd=da*(255-a)/255;
+                int or=(sr*a+dr*wd)/oa,og=(sg*a+dg*wd)/oa,ob=(sb*a+db*wd)/oa;
+                buffer[idx]=(oa<<24)|(or<<16)|(og<<8)|ob;
+            }
         }
     }
 

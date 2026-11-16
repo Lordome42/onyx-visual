@@ -221,6 +221,8 @@
 	"onyxvisual.gui.m.dim.desc": "Плотный фон за меню",
 	"onyxvisual.gui.m.waves": "Фон меню",
 	"onyxvisual.gui.m.waves.desc": "Фигуры и волны от курсора",
+	"onyxvisual.gui.m.lite": "Лёгкий режим",
+	"onyxvisual.gui.m.lite.desc": "Без анимированного фона и надписи, меньше нагрузки на видеокарту",
 	"onyxvisual.gui.m.title": "Название",
 	"onyxvisual.gui.m.title.desc": "Живая надпись Onyx Visual",
 	"onyxvisual.gui.accent": "Цвет акцента",

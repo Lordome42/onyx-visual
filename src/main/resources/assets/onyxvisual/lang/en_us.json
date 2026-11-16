@@ -221,6 +221,8 @@
 	"onyxvisual.gui.m.dim.desc": "Solid background behind the menu",
 	"onyxvisual.gui.m.waves": "Menu background",
 	"onyxvisual.gui.m.waves.desc": "Shapes and cursor waves",
+	"onyxvisual.gui.m.lite": "Lite mode",
+	"onyxvisual.gui.m.lite.desc": "No animated backdrop or title, much lighter on the GPU",
 	"onyxvisual.gui.m.title": "Title",
 	"onyxvisual.gui.m.title.desc": "Animated Onyx Visual title",
 	"onyxvisual.gui.accent": "Accent colour",

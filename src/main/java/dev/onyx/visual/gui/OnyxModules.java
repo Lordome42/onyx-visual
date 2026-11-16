@@ -84,6 +84,7 @@ public final class OnyxModules {
 						new Slider(Tr.get("scale"), Tr.get("scale.hint"), 70, 130, 5, "%", () -> p.scale, v -> { p.scale = (float) v; save.run(); }),
 						new Key(Tr.get("open_key"), Tr.get("open_key.hint"), openKeyLabel))));
 		modules.add(new Module("gui.waves", Tr.get("m.waves"), Tr.get("m.waves.desc"), () -> p.waves, v -> { p.waves = v; save.run(); }, List.of()));
+		modules.add(new Module("gui.lite", Tr.get("m.lite"), Tr.get("m.lite.desc"), () -> p.lite, v -> { p.lite = v; save.run(); }, List.of()));
 		modules.add(new Module("gui.title", Tr.get("m.title"), Tr.get("m.title.desc"), () -> p.title, v -> { p.title = v; save.run(); }, List.of()));
 		return new Category("menu", Tr.raw("onyxvisual.cat.menu"), Tr.raw("onyxvisual.catdesc.menu"), 0xE8B8, modules);
 	}
@@ -111,6 +112,7 @@ public final class OnyxModules {
 				case "gui.dim" -> p.dim = !p.dim;
 				case "gui.waves" -> p.waves = !p.waves;
 				case "gui.title" -> p.title = !p.title;
+				case "gui.lite" -> p.lite = !p.lite;
 				default -> { return false; }
 			}
 			return true;

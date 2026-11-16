@@ -50,6 +50,7 @@ public final class ClickGui {
 
 	private int accent() { return prefs.accent | 0xFF000000; }
 
+	public boolean lite() { return prefs.lite; }
 	public boolean capturingKeys() { return bindingModule != null || searchFocused; }
 
 	/** One frame: draw everything and react to the mouse. */
@@ -75,8 +76,8 @@ public final class ClickGui {
 
 	private void backdrop(UiCanvas ui, Layout l, int mx, int my, boolean down, boolean pressed, float dt) {
 		int bg = prefs.dim ? 0xF8120F17 : 0xB8120F17;
-		shapeWaves.draw(ui, width, height, mx, my, dt, prefs.waves, Colors.fade(bg, .35f + .65f * open.value()));
-		for (int i = 5; i > 0; i--) {
+		shapeWaves.draw(ui, width, height, mx, my, dt, prefs.waves && !ui.lite(), Colors.fade(bg, .35f + .65f * open.value()));
+		for (int i = ui.lite() ? 0 : 3; i > 0; i--) {
 			float spread = i * 2.2f * l.s;
 			ui.roundedRect(l.x - spread, l.y - spread + 3 * l.s, l.w + spread * 2, l.h + spread * 2, 13 * l.s, 0x07000000);
 		}
@@ -85,7 +86,7 @@ public final class ClickGui {
 		  .line(l.x + 12 * l.s, l.y + 52 * l.s, l.x + l.w - 12 * l.s, l.y + 52 * l.s, .65f * l.s, 0xFF242424);
 		float cx = l.x + l.w / 2;
 		if (l.y - 60 * l.s - 23 * l.s > 0) ui.icon(cx, l.y - 60 * l.s, 46 * l.s, accent(), LOGO);
-		if (prefs.title && l.y + l.h + 54 * l.s < height - 2 * l.s)
+		if (prefs.title && !ui.lite() && l.y + l.h + 54 * l.s < height - 2 * l.s)
 			techTitle.draw(ui, cx, l.y + l.h + 54 * l.s, 31 * l.s, l.s, mx, my, down, pressed, dt);
 		float ax = l.x - 5 * l.s, ay = l.y - 5 * l.s, bx = l.x + l.w + 5 * l.s, by = l.y + l.h + 5 * l.s;
 		ui.line(ax, ay, ax + 14 * l.s, ay, .6f * l.s, 0x458C7C5E)

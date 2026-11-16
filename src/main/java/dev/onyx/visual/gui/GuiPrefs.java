@@ -11,6 +11,8 @@ public final class GuiPrefs {
 	public boolean waves = true;
 	public boolean title = true;
 	public boolean dim = true;
+	/** Cheap drawing: flat backdrop, no title, fewer shapes. */
+	public boolean lite;
 	public float scale = 100;
 	public boolean compact;
 	public boolean activeFirst;

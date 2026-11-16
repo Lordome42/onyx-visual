@@ -42,6 +42,11 @@ public class OnyxClientTest implements FabricClientGameTest {
 				context.waitTicks(8);
 				context.takeScreenshot("onyx-clickgui-scale" + gs);
 			}
+			// Lite mode must stay readable and cheap.
+			context.runOnClient(mc -> OnyxConfig.get().gui.lite = true);
+			context.waitTicks(8);
+			context.takeScreenshot("onyx-clickgui-lite");
+			context.runOnClient(mc -> OnyxConfig.get().gui.lite = false);
 			context.runOnClient(mc -> {
 				mc.options.guiScale().set(0);
 				mc.getWindow().setGuiScale(mc.getWindow().calculateScale(0, mc.isEnforceUnicode()));

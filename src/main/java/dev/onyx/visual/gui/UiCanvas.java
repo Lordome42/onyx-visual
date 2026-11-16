@@ -36,6 +36,15 @@ public interface UiCanvas {
 		return triangle(cx, cy - r, cx - r, cy + r, cx + r, cy + r, color);
 	}
 
+	/** True when the player (or the frame-time guard) asked for the cheap drawing mode. */
+	default boolean lite() { return false; }
+
+	/**
+	 * Stretches an ARGB pixel buffer (tw x th) over the GUI rect in a single draw call.
+	 * {@code changed} says the pixels differ from the previous call. Returns false when unsupported.
+	 */
+	default boolean blitPixels(int[] argb, int tw, int th, boolean changed, float x, float y, float w, float h) { return false; }
+
 	void pushScissor(float x, float y, float w, float h);
 	void popScissor();
 

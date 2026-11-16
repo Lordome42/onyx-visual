@@ -20,6 +20,9 @@ public final class ClickGuiScreen extends Screen {
 	private long lastSave;
 	/** Test hook: when set, replaces the real cursor position (GUI units). */
 	private int fakeX = Integer.MIN_VALUE, fakeY;
+	private PerfLog perf;
+	private boolean autoLite;
+	private long lastRealFrame;
 
 	public ClickGuiScreen() {
 		super(Component.translatable("onyxvisual.screen.title"));
@@ -49,8 +52,15 @@ public final class ClickGuiScreen extends Screen {
 			mouseX = fakeX;
 			mouseY = fakeY;
 		}
-		float guiScale = (float) Minecraft.getInstance().getWindow().getGuiScale();
-		McCanvas canvas = new McCanvas(g, this.font, guiScale);
+		com.mojang.blaze3d.platform.Window window = Minecraft.getInstance().getWindow();
+		float guiScale = (float) window.getGuiScale();
+		boolean lite = gui.lite() || autoLite;
+		if (perf == null) perf = new PerfLog(guiScale, this.width, this.height, window.getWidth(), window.getHeight(), lite);
+		double frameMs = lastRealFrame == 0 ? 0 : (now - lastRealFrame) / 1e6;
+		lastRealFrame = now;
+		McCanvas.statFills = 0;
+		McCanvas.statTexts = 0;
+		McCanvas canvas = new McCanvas(g, this.font, guiScale, lite);
 		canvas.begin();
 		try {
 			// A click shorter than one frame still counts as held for that frame (sliders, colour picker).
@@ -58,6 +68,8 @@ public final class ClickGuiScreen extends Screen {
 		} finally {
 			canvas.end();
 		}
+		perf.frame(frameMs, (System.nanoTime() - now) / 1e6, lite);
+		if (perf.autoLite()) autoLite = true;
 		pressed = false;
 		rightPressed = false;
 		if (releaseQueued) {
@@ -124,6 +136,7 @@ public final class ClickGuiScreen extends Screen {
 	@Override
 	public void onClose() {
 		flush();
+		if (perf != null) perf.close();
 		super.onClose();
 	}
 }

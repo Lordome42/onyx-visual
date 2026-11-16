@@ -25,9 +25,12 @@ public final class McCanvas implements UiCanvas {
 	private static final java.util.HashMap<Key, Integer> WIDTHS = new java.util.HashMap<>();
 	private static final java.util.HashMap<String, String> FITS = new java.util.HashMap<>();
 
+	/** Per-frame statistics for the perf log (reset by the screen each frame). */
+	public static int statFills, statTexts, statBlits;
 	private final GuiGraphicsExtractor g;
 	private final Font font;
 	private final float gs;
+	private final boolean lite;
 	private int scissorDepth;
 
 	private static Style style(int kind, int px) {
@@ -44,11 +47,15 @@ public final class McCanvas implements UiCanvas {
 		return COMPONENTS.computeIfAbsent(new Key(kind, px, text), k -> Component.literal(text).withStyle(style(kind, px)));
 	}
 
-	public McCanvas(GuiGraphicsExtractor g, Font font, float guiScale) {
+	public McCanvas(GuiGraphicsExtractor g, Font font, float guiScale, boolean lite) {
 		this.g = g;
 		this.font = font;
 		this.gs = guiScale;
+		this.lite = lite;
 	}
+
+	@Override
+	public boolean lite() { return lite; }
 
 	public void begin() {
 		g.pose().pushMatrix();
@@ -64,6 +71,7 @@ public final class McCanvas implements UiCanvas {
 
 	private void fillPx(int x0, int y0, int x1, int y1, int color) {
 		if (x1 <= x0 || y1 <= y0 || (color >>> 24) == 0) return;
+		statFills++;
 		g.fill(x0, y0, x1, y1, color);
 	}
 
@@ -86,19 +94,44 @@ public final class McCanvas implements UiCanvas {
 		return r - (float) Math.sqrt(r * r - dy * dy);
 	}
 
+	/** Number of steps used to approximate one rounded corner (every step is a single fill). */
+	private int cornerBands(int rr) {
+		return Math.max(1, Math.min(rr, lite ? 1 : Math.min(6, 2 + rr / 5)));
+	}
+
+	/** Group boundaries along an axis of n pixels: corner steps at both ends plus optional uniform steps. */
+	private int[] bounds(int n, int rr, int steps) {
+		java.util.TreeSet<Integer> set = new java.util.TreeSet<>();
+		set.add(0);
+		set.add(n);
+		int nb = cornerBands(rr);
+		for (int k = 1; k <= nb && rr > 0; k++) {
+			int c = Math.round(rr * k / (float) nb);
+			if (c > 0 && c < n) set.add(c);
+			if (n - c > 0 && n - c < n) set.add(n - c);
+		}
+		for (int k = 1; k < steps; k++) set.add(Math.round(n * k / (float) steps));
+		int[] out = new int[set.size()];
+		int i = 0;
+		for (int v : set) out[i++] = v;
+		return out;
+	}
+
 	private void roundedPx(float x, float y, float w, float h, float r, int color) {
 		int top = Math.round(y), bottom = Math.round(y + h);
-		if (bottom <= top || w <= 0) return;
-		r = Math.max(0, Math.min(r, Math.min(w, bottom - top) / 2f));
-		int rr = (int) Math.ceil(r);
-		if (rr == 0) { span0(top, bottom, x, x + w, color); return; }
-		for (int j = 0; j < rr && top + j < bottom - j; j++) {
-			float dy = r - (j + 0.5f);
-			float in = dy > 0 ? inset(r, dy) : 0;
-			span(top + j, x + in, x + w - in, color);
-			if (bottom - 1 - j != top + j) span(bottom - 1 - j, x + in, x + w - in, color);
+		int n = bottom - top;
+		if (n <= 0 || w <= 0) return;
+		r = Math.max(0, Math.min(r, Math.min(w, n) / 2f));
+		int rr = Math.min((int) Math.ceil(r), n / 2);
+		int ix0 = Math.round(x), ix1 = Math.round(x + w);
+		if (rr == 0) { fillPx(ix0, top, ix1, bottom, color); return; }
+		int[] b = bounds(n, rr, 0);
+		for (int i = 0; i + 1 < b.length; i++) {
+			float c = (b[i] + b[i + 1]) / 2f;
+			float d = Math.min(c, n - c);
+			float in = d < r ? inset(r, r - d) : 0;
+			fillPx(Math.round(x + in), top + b[i], Math.round(x + w - in), top + b[i + 1], color);
 		}
-		if (top + rr < bottom - rr) span0(top + rr, bottom - rr, x, x + w, color);
 	}
 
 	/** Several identical rows at once. */
@@ -127,32 +160,53 @@ public final class McCanvas implements UiCanvas {
 		float X = x * gs, Y = y * gs, W = w * gs, H = h * gs, R = r * gs, S = stroke * gs;
 		if (S < 1) { color = Colors.fade(color, S); S = 1; }
 		int top = Math.round(Y), bottom = Math.round(Y + H);
-		if (bottom <= top) return this;
-		R = Math.max(0, Math.min(R, Math.min(W, bottom - top) / 2f));
+		int n = bottom - top;
+		if (n <= 0 || W <= 0) return this;
+		R = Math.max(0, Math.min(R, Math.min(W, n) / 2f));
 		float iR = Math.max(0, R - S);
 		int is = Math.max(1, Math.round(S));
-		int rr = (int) Math.ceil(R);
-		int mid0 = top + Math.max(rr, is), mid1 = bottom - Math.max(rr, is);
-		for (int row = top; row < bottom; row++) {
-			if (row >= mid0 && row < mid1) {
-				// straight section: both side strips in one call each, for all remaining rows
-				span0(row, mid1, X, X + S, color);
-				span0(row, mid1, X + W - S, X + W, color);
-				row = mid1 - 1;
-				continue;
+		if (lite) { // four plain strips
+			int x0 = Math.round(X), x1 = Math.round(X + W);
+			fillPx(x0, top, x1, top + is, color);
+			fillPx(x0, bottom - is, x1, bottom, color);
+			fillPx(x0, top + is, x0 + is, bottom - is, color);
+			fillPx(x1 - is, top + is, x1, bottom - is, color);
+			return this;
+		}
+		int rr = Math.min((int) Math.ceil(R), n / 2);
+		int T = Math.min(Math.max(rr, is), n / 2);
+		int sx = Math.max(1, Math.round(S));
+		java.util.TreeSet<Integer> set = new java.util.TreeSet<>();
+		set.add(0);
+		set.add(T);
+		int nb = cornerBands(rr);
+		for (int k = 1; k <= nb && rr > 0; k++) set.add(Math.min(T, Math.round(rr * k / (float) nb)));
+		set.add(Math.min(T, is));
+		Integer[] b = set.toArray(new Integer[0]);
+		for (int i = 0; i + 1 < b.length; i++) {
+			int a0 = b[i], a1 = b[i + 1];
+			if (a1 <= a0) continue;
+			float c = (a0 + a1) / 2f;
+			float out = c < R ? inset(R, R - c) : 0;
+			float xl = X + out, xr = X + W - out;
+			boolean full = a1 <= is;
+			float in = 0;
+			if (!full) {
+				float di = c - S;
+				in = di < iR ? inset(iR, iR - di) : 0;
 			}
-			float cyTop = row + 0.5f - top, cyBot = bottom - (row + 0.5f);
-			float d = Math.min(cyTop, cyBot);
-			float out = d < R ? inset(R, R - d) : 0;
-			float ol = X + out, or = X + W - out;
-			if (row < top + is || row >= bottom - is) {
-				span(row, ol, or, color);
-				continue;
+			for (int side = 0; side < 2; side++) {
+				int y0 = side == 0 ? top + a0 : bottom - a1, y1 = side == 0 ? top + a1 : bottom - a0;
+				if (full) fillPx(Math.round(xl), y0, Math.round(xr), y1, color);
+				else {
+					fillPx(Math.round(xl), y0, Math.round(X + S + in), y1, color);
+					fillPx(Math.round(X + W - S - in), y0, Math.round(xr), y1, color);
+				}
 			}
-			float di = d - S;
-			float in = di < iR ? inset(iR, iR - di) : 0;
-			span(row, ol, X + S + in, color);
-			span(row, X + W - S - in, or, color);
+		}
+		if (n - 2 * T > 0) {
+			fillPx(Math.round(X), top + T, Math.round(X) + sx, bottom - T, color);
+			fillPx(Math.round(X + W) - sx, top + T, Math.round(X + W), bottom - T, color);
 		}
 		return this;
 	}
@@ -161,24 +215,26 @@ public final class McCanvas implements UiCanvas {
 	public UiCanvas gradientRoundedRect(float x, float y, float w, float h, float r, int from, int to, boolean horizontal) {
 		float X = x * gs, Y = y * gs, W = w * gs, H = h * gs, R = Math.min(r * gs, Math.min(W, H) / 2f);
 		if (W <= 0 || H <= 0) return this;
+		int steps = lite ? 3 : 12;
 		if (!horizontal) {
-			int top = Math.round(Y), bottom = Math.round(Y + H);
-			for (int row = top; row < bottom; row++) {
-				float t = (row + 0.5f - top) / Math.max(1, bottom - top);
-				float d = Math.min(row + 0.5f - top, bottom - (row + 0.5f));
+			int top = Math.round(Y), bottom = Math.round(Y + H), n = bottom - top;
+			if (n <= 0) return this;
+			int[] b = bounds(n, Math.min((int) Math.ceil(R), n / 2), steps);
+			for (int i = 0; i + 1 < b.length; i++) {
+				float c = (b[i] + b[i + 1]) / 2f;
+				float d = Math.min(c, n - c);
 				float in = d < R ? inset(R, R - d) : 0;
-				span(row, X + in, X + W - in, Colors.mix(from, to, t));
+				fillPx(Math.round(X + in), top + b[i], Math.round(X + W - in), top + b[i + 1], Colors.mix(from, to, c / n));
 			}
 		} else {
-			int left = (int) Math.floor(X), right = (int) Math.ceil(X + W);
-			for (int col = left; col < right; col++) {
-				float t = (col + 0.5f - X) / W;
-				float d = Math.min(col + 0.5f - X, X + W - (col + 0.5f));
-				float in = d < R ? inset(R, R - Math.max(0, d)) : 0;
-				float cover = Math.min(col + 1, X + W) - Math.max(col, X);
-				int c = Colors.mix(from, to, t);
-				if (cover < 0.98f) c = Colors.fade(c, cover);
-				fillPx(col, Math.round(Y + in), col + 1, Math.round(Y + H - in), c);
+			int left = Math.round(X), right = Math.round(X + W), n = right - left;
+			if (n <= 0) return this;
+			int[] b = bounds(n, Math.min((int) Math.ceil(R), n / 2), steps);
+			for (int i = 0; i + 1 < b.length; i++) {
+				float c = (b[i] + b[i + 1]) / 2f;
+				float d = Math.min(c, n - c);
+				float in = d < R ? inset(R, R - d) : 0;
+				fillPx(left + b[i], Math.round(Y + in), left + b[i + 1], Math.round(Y + H - in), Colors.mix(from, to, c / n));
 			}
 		}
 		return this;
@@ -228,11 +284,16 @@ public final class McCanvas implements UiCanvas {
 		float[][] p = {{x1 * gs, y1 * gs}, {x2 * gs, y2 * gs}, {x3 * gs, y3 * gs}};
 		java.util.Arrays.sort(p, (a, b) -> Float.compare(a[1], b[1]));
 		int top = Math.round(p[0][1]), bottom = Math.round(p[2][1]);
-		for (int row = top; row < bottom; row++) {
-			float yy = row + 0.5f;
+		int n = bottom - top;
+		if (n <= 0) return this;
+		int groups = Math.min(n, lite ? 3 : 6);
+		for (int gi = 0; gi < groups; gi++) {
+			int r0 = top + Math.round(n * gi / (float) groups), r1 = top + Math.round(n * (gi + 1) / (float) groups);
+			if (r1 <= r0) continue;
+			float yy = (r0 + r1) / 2f;
 			float xa = edge(p[0], p[2], yy);
 			float xb = yy < p[1][1] ? edge(p[0], p[1], yy) : edge(p[1], p[2], yy);
-			span(row, Math.min(xa, xb), Math.max(xa, xb), color);
+			fillPx(Math.round(Math.min(xa, xb)), r0, Math.round(Math.max(xa, xb)), r1, color);
 		}
 		return this;
 	}
@@ -244,8 +305,14 @@ public final class McCanvas implements UiCanvas {
 
 	// ------------------------------------------------------------------ text
 
+	/** Font sizes that exist in the jar: every pixel up to 24, then a few larger steps (keeps the font count low). */
+	static final int[] SIZES = {6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 26, 28, 30, 32, 36, 40, 44, 48, 56, 64};
+
 	private static int pixelSize(float guiSize, float gs) {
-		return Math.max(MIN_PX, Math.min(MAX_PX, Math.round(guiSize * gs)));
+		int want = Math.max(MIN_PX, Math.min(MAX_PX, Math.round(guiSize * gs)));
+		int best = SIZES[0];
+		for (int s : SIZES) if (Math.abs(s - want) < Math.abs(best - want)) best = s;
+		return best;
 	}
 
 	private void drawText(int kind, float x, float cy, float size, int color, String text) {
@@ -256,6 +323,7 @@ public final class McCanvas implements UiCanvas {
 		// Whole pixels only: fractional text positions are what made the text blurry.
 		int px = Math.round(icon ? x * gs : x * gs);
 		int py = Math.round(baseline) - 7; // the font baseline sits 7 units below a glyph's top
+		statTexts++;
 		g.text(font, component(kind, P, text), px, py, color, false);
 	}
 
@@ -321,6 +389,51 @@ public final class McCanvas implements UiCanvas {
 			}
 		}
 		return this;
+	}
+
+	// ------------------------------------------------------------------ pixel buffer
+
+	private static final net.minecraft.resources.Identifier BG_ID = OnyxVisual.id("background");
+	private static BgTexture bgTex;
+	private static int bgW, bgH;
+	private static boolean bgFailed;
+
+	/** Dynamic texture with a smooth (linear) sampler so the low-resolution backdrop is stretched softly. */
+	private static final class BgTexture extends net.minecraft.client.renderer.texture.DynamicTexture {
+		BgTexture(int w, int h) {
+			super("onyxvisual_background", w, h, true);
+			this.sampler = com.mojang.blaze3d.systems.RenderSystem.getSamplerCache().getClampToEdge(com.mojang.blaze3d.textures.FilterMode.LINEAR);
+		}
+	}
+
+	@Override
+	public boolean blitPixels(int[] argb, int tw, int th, boolean changed, float x, float y, float w, float h) {
+		if (bgFailed) return false;
+		try {
+			if (bgTex == null || bgW != tw || bgH != th) {
+				net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
+				if (bgTex != null) mc.getTextureManager().release(BG_ID);
+				bgTex = new BgTexture(tw, th);
+				bgW = tw;
+				bgH = th;
+				mc.getTextureManager().register(BG_ID, bgTex);
+				changed = true;
+			}
+			if (changed) {
+				com.mojang.blaze3d.platform.NativeImage img = bgTex.getPixels();
+				for (int j = 0; j < th; j++) for (int i = 0; i < tw; i++) img.setPixel(i, j, argb[j * tw + i]);
+				bgTex.upload();
+			}
+			statBlits++;
+			g.blit(net.minecraft.client.renderer.RenderPipelines.GUI_TEXTURED, BG_ID, Math.round(x * gs), Math.round(y * gs), 0f, 0f,
+					Math.round(w * gs), Math.round(h * gs), tw, th, tw, th);
+			return true;
+		} catch (Throwable t) {
+			OnyxVisual.LOGGER.warn("Background texture failed, using flat backdrop", t);
+			bgTex = null;
+			bgFailed = true;
+			return false;
+		}
 	}
 
 	// ------------------------------------------------------------------ scissor
