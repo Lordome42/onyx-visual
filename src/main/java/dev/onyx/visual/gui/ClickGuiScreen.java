@@ -12,7 +12,8 @@ import net.minecraft.network.chat.Component;
 
 /** Minecraft screen hosting the Onyx Visual ClickGUI (opens with Right Shift by default). */
 public final class ClickGuiScreen extends Screen {
-	private final ClickGui gui;
+	private ClickGui gui;
+	private boolean rebuild;
 	private long lastFrame = System.nanoTime();
 	private boolean down, pressed, rightPressed, releaseQueued;
 	/** Settings are written at most twice a second (a slider drag changes them every frame). */
@@ -29,8 +30,16 @@ public final class ClickGuiScreen extends Screen {
 		OnyxConfig config = OnyxConfig.get();
 		Tr.set(key -> net.minecraft.client.resources.language.I18n.get(key));
 		Runnable save = () -> dirty = true;
-		gui = new ClickGui(OnyxModules.create(config, save, () -> OnyxVisual.settingsKey.getTranslatedKeyMessage().getString().toUpperCase(java.util.Locale.ROOT)),
-				config.gui, Binds.get(), save);
+		this.saveHook = save;
+		gui = build();
+	}
+
+	private final Runnable saveHook;
+
+	private ClickGui build() {
+		OnyxConfig config = OnyxConfig.get();
+		return new ClickGui(OnyxModules.create(config, saveHook, () -> OnyxVisual.settingsKey.getTranslatedKeyMessage().getString().toUpperCase(java.util.Locale.ROOT)),
+				config.gui, Binds.get(), saveHook, () -> rebuild = true);
 	}
 
 	@Override
@@ -45,6 +54,10 @@ public final class ClickGuiScreen extends Screen {
 
 	@Override
 	public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
+		if (rebuild) {
+			rebuild = false;
+			gui = build();
+		}
 		long now = System.nanoTime();
 		float dt = Math.min(.05f, (now - lastFrame) / 1_000_000_000f);
 		lastFrame = now;
@@ -93,6 +106,23 @@ public final class ClickGuiScreen extends Screen {
 		down = true;
 		releaseQueued = true;
 	}
+
+	/** Test hook: clicks the star of the first card. */
+	public void debugClickStar() {
+		fakeX = Math.round(gui.firstStarX);
+		fakeY = Math.round(gui.firstStarY);
+		pressed = true;
+		down = true;
+		releaseQueued = true;
+	}
+
+	/** Test hook: shows the Configs page. */
+	public void debugOpenConfigs() {
+		OnyxConfig.get().gui.category = OnyxModules.LAYOUT.length + 1;
+		rebuild = true;
+	}
+
+	public int debugFavorites() { return gui.favoriteCount(); }
 
 	@Override
 	public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {

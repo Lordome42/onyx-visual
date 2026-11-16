@@ -38,6 +38,8 @@ public interface UiCanvas {
 
 	/** True when the player (or the frame-time guard) asked for the cheap drawing mode. */
 	default boolean lite() { return false; }
+	/** Framebuffer pixels per GUI unit. */
+	default float pixelScale() { return 1; }
 
 	/**
 	 * Stretches an ARGB pixel buffer (tw x th) over the GUI rect in a single draw call.

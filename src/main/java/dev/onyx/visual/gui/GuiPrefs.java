@@ -13,6 +13,8 @@ public final class GuiPrefs {
 	public boolean dim = true;
 	/** Cheap drawing: flat backdrop, no title, fewer shapes. */
 	public boolean lite;
+	/** Name of the profile that was loaded or saved last. */
+	public String profile = "";
 	public float scale = 100;
 	public boolean compact;
 	public boolean activeFirst;
@@ -21,6 +23,7 @@ public final class GuiPrefs {
 
 	public void sanitize() {
 		if (favorites == null) favorites = new ArrayList<>();
+		if (profile == null) profile = "";
 		if (scale < 70 || scale > 130) scale = 100;
 		if ((accent >>> 24) == 0) accent |= 0xFF000000;
 	}

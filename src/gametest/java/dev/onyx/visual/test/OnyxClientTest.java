@@ -12,6 +12,10 @@ public class OnyxClientTest implements FabricClientGameTest {
 	public void runTest(ClientGameTestContext context) {
 		try (TestSingleplayerContext world = context.worldBuilder().create()) {
 			context.waitTicks(100);
+			// A fresh install starts with every function off.
+			int onAtStart = context.computeOnClient(mc -> setAll(false, true));
+			if (onAtStart != 0) throw new AssertionError(onAtStart + " functions are on in a fresh config");
+			context.runOnClient(mc -> setAll(true, false));
 			world.getServer().runCommand("time set noon");
 			world.getServer().runCommand("weather clear");
 			context.waitTicks(40);
@@ -32,6 +36,12 @@ public class OnyxClientTest implements FabricClientGameTest {
 			}
 			context.runOnClient(mc -> ((dev.onyx.visual.gui.ClickGuiScreen) mc.gui.screen()).debugClickFirstCard());
 			context.waitTicks(6);
+			context.runOnClient(mc -> ((dev.onyx.visual.gui.ClickGuiScreen) mc.gui.screen()).debugClickStar());
+			context.waitTicks(6);
+			if (context.computeOnClient(mc -> ((dev.onyx.visual.gui.ClickGuiScreen) mc.gui.screen()).debugFavorites()) != 1) {
+				throw new AssertionError("Clicking the star did not mark the module as favourite");
+			}
+			context.takeScreenshot("onyx-clickgui-star");
 			for (int scale = 1; scale <= 4; scale++) {
 				final int gs = scale;
 				context.runOnClient(mc -> {
@@ -52,7 +62,30 @@ public class OnyxClientTest implements FabricClientGameTest {
 				mc.getWindow().setGuiScale(mc.getWindow().calculateScale(0, mc.isEnforceUnicode()));
 				mc.resizeGui();
 			});
+			// Configs page: save a profile, change a setting, load it back.
+			context.runOnClient(mc -> {
+				OnyxConfig c = OnyxConfig.get();
+				c.hudPos.put("stats", new int[]{40, 30});
+				dev.onyx.visual.gui.Profiles.save("Test config", 0xFF6FA8FF, c);
+				dev.onyx.visual.gui.Profiles.save("Night PvP", 0xFFFF6B6B, c);
+				((dev.onyx.visual.gui.ClickGuiScreen) mc.gui.screen()).debugOpenConfigs();
+			});
+			context.waitTicks(8);
+			context.takeScreenshot("onyx-clickgui-configs");
+			context.runOnClient(mc -> {
+				OnyxConfig c = OnyxConfig.get();
+				c.aurora = false;
+				c.hudPos.clear();
+				var info = dev.onyx.visual.gui.Profiles.list().stream().filter(i -> i.name().equals("Test config")).findFirst().orElseThrow();
+				dev.onyx.visual.gui.Profiles.load(info, c);
+				if (!c.aurora || c.hudPos.get("stats") == null || c.hudPos.get("stats")[0] != 40) throw new AssertionError("Profile did not restore the settings");
+			});
 			context.runOnClient(mc -> OnyxConfig.get().birds = true);
+			context.setScreen(() -> null);
+			// HUD edit mode in the chat.
+			context.runOnClient(mc -> mc.gui.setScreen(new net.minecraft.client.gui.screens.ChatScreen("", false)));
+			context.waitTicks(10);
+			context.takeScreenshot("onyx-hud-edit");
 			context.setScreen(() -> null);
 
 			// ---- On-screen widgets.
@@ -635,5 +668,21 @@ public class OnyxClientTest implements FabricClientGameTest {
 			context.waitTicks(60);
 			context.takeScreenshot("onyx-nether-warped");
 		}
+	}
+
+	private static int setAll(boolean value, boolean count) {
+		int on = 0;
+		for (java.lang.reflect.Field f : OnyxConfig.class.getFields()) {
+			if (f.getType() != boolean.class || java.lang.reflect.Modifier.isStatic(f.getModifiers())) continue;
+			try {
+				if (count) {
+					if (f.getBoolean(OnyxConfig.get())) on++;
+				} else {
+					f.setBoolean(OnyxConfig.get(), value);
+				}
+			} catch (IllegalAccessException ignored) {
+			}
+		}
+		return on;
 	}
 }

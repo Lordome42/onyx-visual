@@ -36,9 +36,13 @@ public final class ClickGui {
 	private float scrollOffset, scrollTarget, maxScroll;
 	private float width, height, gs = 2;
 	/** Last drawn position of the first card (GUI units); used by in-game tests. */
-	public float firstCardX = -1, firstCardY = -1;
+	public float firstCardX = -1, firstCardY = -1, firstStarX = -1, firstStarY = -1;
+	public int favoriteCount() { return favorites.size(); }
 
-	public ClickGui(List<Category> categories, GuiPrefs prefs, Binds binds, Runnable save) {
+	private final ProfilesPanel profiles;
+
+	public ClickGui(List<Category> categories, GuiPrefs prefs, Binds binds, Runnable save, Runnable onProfileLoaded) {
+		this.profiles = new ProfilesPanel(dev.onyx.visual.OnyxConfig.get(), onProfileLoaded);
 		this.categories = categories;
 		this.prefs = prefs;
 		this.binds = binds;
@@ -51,7 +55,7 @@ public final class ClickGui {
 	private int accent() { return prefs.accent | 0xFF000000; }
 
 	public boolean lite() { return prefs.lite; }
-	public boolean capturingKeys() { return bindingModule != null || searchFocused; }
+	public boolean capturingKeys() { return bindingModule != null || searchFocused || profiles.typing(); }
 
 	/** One frame: draw everything and react to the mouse. */
 	public void frame(UiCanvas ui, float width, float height, float guiScale, int mouseX, int mouseY, boolean down, boolean pressed, boolean rightPressed, float dt) {
@@ -68,8 +72,17 @@ public final class ClickGui {
 		backdrop(ui, l, mouseX, mouseY, down, pressed, dt);
 		sidebar(ui, l, mouseX, mouseY, baseDown, basePressed, dt);
 		Category category = categories.get(categoryIndex);
-		header(ui, l, category, mouseX, mouseY, basePressed);
-		moduleGrid(ui, l, category, mouseX, mouseY, baseDown, basePressed, baseRightPressed, dt);
+		if (category.id().equals("configs")) {
+			float cy = l.y + 79 * l.s;
+			ui.icon(l.mainX + 12 * l.s, cy, 21 * l.s, accent(), category.icon());
+			ui.strongText(l.mainX + 31 * l.s, cy - 2 * l.s, 11 * l.s, WHITE, category.name());
+			ui.text(l.mainX + 31 * l.s, cy + 12 * l.s, 7.6f * l.s, MUTED, ui.fit(category.description(), 7.6f * l.s, false, l.mainW - 40 * l.s));
+			searchFocused = false;
+			profiles.draw(ui, l.mainX, l.y + 108 * l.s, l.mainW, l.y + l.h - 12 * l.s, l.s, accent(), mouseX, mouseY, basePressed);
+		} else {
+			header(ui, l, category, mouseX, mouseY, basePressed);
+			moduleGrid(ui, l, category, mouseX, mouseY, baseDown, basePressed, baseRightPressed, dt);
+		}
 		settings.drawPopups(ui, new SettingsPanel.Bounds(l.x, l.y, l.w, l.h, l.mainX, l.mainW, l.s), mouseX, mouseY, down, pressed);
 		if (!down) settings.released();
 	}
@@ -213,13 +226,15 @@ public final class ClickGui {
 			if (i == 0) {
 				firstCardX = l.mainX + 40 * l.s;
 				firstCardY = ys[0] + 16 * l.s;
+				firstStarX = l.mainX + 16.5f * l.s;
+				firstStarY = firstCardY;
 			}
 			float x = l.mainX + column * (columnW + gap), y = ys[column];
 			float baseH = CardRenderer.baseHeight(m, l.s), settingsH = expandedModules.contains(m) ? SettingsPanel.height(m, l.s) : 0;
 			float cardH = baseH + settingsH;
 			boolean onScreen = y + cardH > viewportTop - 2 && y < viewportBottom + 2;
 			boolean over = pointerInView && hit(mx, my, x, y, columnW, 33 * l.s);
-			boolean star = pressed && over && hit(mx, my, x + 7 * l.s, y + 6 * l.s, 19 * l.s, 20 * l.s);
+			boolean star = pressed && over && hit(mx, my, x + 3 * l.s, y + 2 * l.s, 26 * l.s, 28 * l.s);
 			boolean settingsButton = pressed && over && !m.settings.isEmpty() && hit(mx, my, x + columnW - 45 * l.s, y + 5 * l.s, 17 * l.s, 22 * l.s);
 			boolean bindButton = pressed && pointerInView && hit(mx, my, x + columnW - 44 * l.s, y + 42 * l.s, 34 * l.s, 15 * l.s);
 			if (bindButton) {
@@ -275,6 +290,7 @@ public final class ClickGui {
 	// ------------------------------------------------------------------ input
 
 	public boolean charTyped(String chars) {
+		if (profiles.typing()) return profiles.charTyped(chars);
 		if (searchFocused && search.length() < 28) {
 			search += chars;
 			scrollOffset = scrollTarget = 0;
@@ -285,6 +301,7 @@ public final class ClickGui {
 
 	/** @return true when the key was consumed. */
 	public boolean keyPressed(int key) {
+		if (profiles.typing()) return profiles.keyPressed(key);
 		if (bindingModule != null) {
 			Module target = bindingModule;
 			bindingModule = null;
@@ -309,6 +326,8 @@ public final class ClickGui {
 
 	public boolean mouseScrolled(double mouseX, double mouseY, double amount) {
 		Layout l = Layout.create(width, height, prefs.scale / 100f, gs);
+		if (categories.get(categoryIndex).id().equals("configs"))
+			return hit((float) mouseX, (float) mouseY, l.mainX, l.y + 108 * l.s, l.mainW, l.h - 120 * l.s) && profiles.scrolled((float) amount, 36 * l.s);
 		if (hit((float) mouseX, (float) mouseY, l.mainX, l.y + 119 * l.s, l.mainW, l.h - 131 * l.s)) {
 			scrollTarget = Math.max(0, Math.min(maxScroll, scrollTarget - (float) amount * 36 * l.s));
 			settings.closePopups();

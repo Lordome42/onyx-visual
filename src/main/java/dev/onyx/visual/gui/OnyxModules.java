@@ -42,6 +42,7 @@ public final class OnyxModules {
 			list.add(new Category(cat, Tr.raw("onyxvisual.cat." + cat), Tr.raw("onyxvisual.catdesc." + cat), ICONS[c], modules));
 		}
 		list.add(menuCategory(config, save, openKeyLabel));
+		list.add(new Category("configs", Tr.raw("onyxvisual.cat.configs"), Tr.raw("onyxvisual.catdesc.configs"), 0xE161, List.of()));
 		return list;
 	}
 

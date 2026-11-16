@@ -100,23 +100,32 @@ public final class Hud {
 				return;
 			}
 			if (config.hudCompass) {
-				compass(g, mc.font, player);
+				HudLayout.begin(g, "compass");
+				try { compass(g, mc.font, player); } finally { HudLayout.end(g); }
 			}
-			look(g, mc, player, level, dt, config.hudLook);
-			schematic(g, mc, player, level, dt, config.hudSchematic);
-			titles(g, mc.font, player, level, dt, config.hudTitles);
+			HudLayout.begin(g, "look");
+			try { look(g, mc, player, level, dt, config.hudLook); } finally { HudLayout.end(g); }
+			HudLayout.begin(g, "schematic");
+			try { schematic(g, mc, player, level, dt, config.hudSchematic); } finally { HudLayout.end(g); }
+			HudLayout.begin(g, "titles");
+			try { titles(g, mc.font, player, level, dt, config.hudTitles); } finally { HudLayout.end(g); }
 			crosshair(g, player, dt, config.hudCrosshair);
 			if (config.hudKeys) {
-				keys(g, mc, dt);
+				HudLayout.begin(g, "keys");
+				try { keys(g, mc, dt); } finally { HudLayout.end(g); }
 			}
 			if (config.hudGear) {
-				gear(g, mc.font, player);
+				HudLayout.begin(g, "gear");
+				try { gear(g, mc.font, player); } finally { HudLayout.end(g); }
 			}
 			if (config.hudStats) {
-				stats(g, mc, player, dt);
+				HudLayout.begin(g, "stats");
+				try { stats(g, mc, player, dt); } finally { HudLayout.end(g); }
 			}
-			flight(g, mc.font, player, dt, config.hudFlight);
+			HudLayout.begin(g, "flight");
+			try { flight(g, mc.font, player, dt, config.hudFlight); } finally { HudLayout.end(g); }
 			Toasts.render(g, mc, player, dt);
+			HudLayout.edit(g, mc);
 		} catch (RuntimeException e) {
 			// A drawing mistake must not take the whole HUD (or the game) down.
 			OnyxVisual.LOGGER.debug("HUD widget failed", e);
@@ -586,6 +595,7 @@ public final class Hud {
 		int y = OnyxConfig.get().hud ? 52 : 6;
 		int w = 10 + font.width("FPS " + fps) + 9 + (ping >= 0 ? font.width(ping + " ms") + 9 : 0) + font.width(speedText) + 3 + font.width(speedUnit);
 		Ui.panel(g, x, y, w, 14, 1.0f);
+		HudLayout.report("stats", x, y, w, 14);
 		int tx = x + 5;
 		g.text(font, "FPS", tx, y + 3, Ui.DIM, false);
 		tx += font.width("FPS ");

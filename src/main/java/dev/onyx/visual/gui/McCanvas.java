@@ -57,6 +57,9 @@ public final class McCanvas implements UiCanvas {
 	@Override
 	public boolean lite() { return lite; }
 
+	@Override
+	public float pixelScale() { return gs; }
+
 	public void begin() {
 		g.pose().pushMatrix();
 		g.pose().scale(1 / gs, 1 / gs);
@@ -308,8 +311,13 @@ public final class McCanvas implements UiCanvas {
 	/** Font sizes that exist in the jar: every pixel up to 24, then a few larger steps (keeps the font count low). */
 	static final int[] SIZES = {6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 26, 28, 30, 32, 36, 40, 44, 48, 56, 64};
 
-	private static int pixelSize(float guiSize, float gs) {
-		int want = Math.max(MIN_PX, Math.min(MAX_PX, Math.round(guiSize * gs)));
+	/** Letters are drawn a bit larger than the design size: the menu was too small to read comfortably. */
+	static final float TEXT_BOOST = 1.22f;
+
+	private static int pixelSize(float guiSize, float gs) { return pixelSize(guiSize, gs, true); }
+
+	private static int pixelSize(float guiSize, float gs, boolean text) {
+		int want = Math.max(MIN_PX, Math.min(MAX_PX, Math.round(guiSize * gs * (text ? TEXT_BOOST : 1f))));
 		int best = SIZES[0];
 		for (int s : SIZES) if (Math.abs(s - want) < Math.abs(best - want)) best = s;
 		return best;
@@ -317,8 +325,8 @@ public final class McCanvas implements UiCanvas {
 
 	private void drawText(int kind, float x, float cy, float size, int color, String text) {
 		if (text.isEmpty() || (color >>> 24) < 5) return;
-		int P = pixelSize(size, gs);
 		boolean icon = kind == KIND_ICON;
+		int P = pixelSize(size, gs, !icon);
 		float baseline = icon ? cy * gs + P / 2f : cy * gs + P * CAP_HEIGHT / 2f;
 		// Whole pixels only: fractional text positions are what made the text blurry.
 		int px = Math.round(icon ? x * gs : x * gs);
@@ -329,7 +337,7 @@ public final class McCanvas implements UiCanvas {
 
 	@Override
 	public UiCanvas icon(float cx, float cy, float size, int color, int codepoint) {
-		int P = pixelSize(size, gs);
+		int P = pixelSize(size, gs, false);
 		drawText(KIND_ICON, cx - (P / gs) / 2f, cy, size, color, new String(Character.toChars(codepoint)));
 		return this;
 	}
@@ -421,7 +429,11 @@ public final class McCanvas implements UiCanvas {
 			}
 			if (changed) {
 				com.mojang.blaze3d.platform.NativeImage img = bgTex.getPixels();
-				for (int j = 0; j < th; j++) for (int i = 0; i < tw; i++) img.setPixel(i, j, argb[j * tw + i]);
+				java.nio.IntBuffer dst = org.lwjgl.system.MemoryUtil.memIntBuffer(img.getPointer(), tw * th);
+				for (int i = 0, n = tw * th; i < n; i++) {
+					int v = argb[i];
+					dst.put(i, (v & 0xFF00FF00) | ((v >> 16) & 0xFF) | ((v & 0xFF) << 16)); // ARGB -> ABGR
+				}
 				bgTex.upload();
 			}
 			statBlits++;

@@ -52,12 +52,15 @@ final class ShapeWaves {
             }
         }
         boolean animating=active||introTime<1.6f;
-        int maxW=ui.lite()?240:480;
-        int tw=Math.max(32,Math.min(maxW,Math.round(width))),th=Math.max(18,Math.round(tw*height/width));
+        int maxW=ui.lite()?640:1280;
+        int tw=Math.max(32,Math.min(maxW,Math.round(width*ui.pixelScale()*.67f))),th=Math.max(18,Math.round(tw*height/width));
+        sinceRaster+=dt;
         boolean fresh=buffer==null||bufW!=tw||bufH!=th||lastBackground!=background;
         if(fresh){buffer=new int[tw*th];bufW=tw;bufH=th;lastBackground=background;}
-        if(fresh||animating||dirtyOnce){
-            dirtyOnce=false;
+        if(wasAnimating&&!animating)dirtyOnce=true;
+        wasAnimating=animating;
+        if(fresh||dirtyOnce||(animating&&sinceRaster>=.033f)){
+            dirtyOnce=false;sinceRaster=0;
             java.util.Arrays.fill(buffer,background);
             rasterize(width,height,tw,th);
             changed=true;
@@ -69,6 +72,8 @@ final class ShapeWaves {
     private int[] buffer;
     private int bufW,bufH,lastBackground;
     private boolean changed=true,dirtyOnce=true;
+    private float sinceRaster;
+    private boolean wasAnimating;
 
     /** Software-renders the cell grid into a small ARGB buffer; one texture blit replaces thousands of fills. */
     private void rasterize(float width,float height,int tw,int th){

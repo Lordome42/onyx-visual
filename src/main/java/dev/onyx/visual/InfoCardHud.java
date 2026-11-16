@@ -95,6 +95,17 @@ public final class InfoCardHud implements HudElement {
 		int x = 6 - (int) ((1.0f - eased) * 12.0f);
 		int y = 6;
 
+		dev.onyx.visual.hud.HudLayout.report("info", x, y, width, height);
+		dev.onyx.visual.hud.HudLayout.begin(graphics, "info");
+		try {
+			drawCard(graphics, font, alpha, eased, x, y, width, height, dayTime, night, time, dayText, coords, heading, biome, timeWidth);
+		} finally {
+			dev.onyx.visual.hud.HudLayout.end(graphics);
+		}
+	}
+
+	private void drawCard(GuiGraphicsExtractor graphics, Font font, int alpha, float eased, int x, int y, int width, int height, int dayTime,
+			boolean night, String time, Component dayText, String coords, Component heading, Component biome, int timeWidth) {
 		int panel = argb(alpha * 150 / 255, 0x0E0F1A);
 		graphics.fill(x + 1, y, x + width - 1, y + height, panel);
 		graphics.fill(x, y + 1, x + 1, y + height - 1, panel);
